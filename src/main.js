@@ -144,4 +144,11 @@ els.bLock.addEventListener("click", () => {
   flash("Lock needs the global hotkey: ⌘⇧L");
 });
 
+// backdrop glass ↔ fully clear
+els.bGlass = document.getElementById("b-glass");
+els.bGlass.addEventListener("click", () => {
+  const clear = document.body.classList.toggle("clear");
+  flash(clear ? "Fully clear — no backdrop" : "Glass backdrop on");
+});
+
 requestAnimationFrame(raf);

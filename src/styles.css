@@ -15,6 +15,23 @@ body {
   cursor: default;
 }
 
+/* ── glass backdrop (legibility layer, toggleable to fully clear) ── */
+#glass {
+  position: fixed;
+  inset: 8px;
+  border-radius: 20px;
+  background: rgba(14, 14, 18, 0.30);
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+  backdrop-filter: blur(22px) saturate(1.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: opacity 0.25s;
+}
+/* "clear" mode: nothing behind the lyrics at all */
+body.clear #glass {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* ── chrome (drag strip + toolbar) ─────────────────────────── */
 #chrome {
   position: fixed;
