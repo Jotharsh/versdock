@@ -30,11 +30,17 @@ transparent overlay ── drag · pin · click-through lock · your colours
 
 ## Honest limits
 * Line-synced, not word-by-word karaoke (LRCLIB is line-level).
-* Lyrics only where LRCLIB has them — the overlay says so otherwise.
+* Lyrics only where LRCLIB has them — the overlay says so otherwise
+  (and falls back to unsynced text when only plain lyrics exist).
 * Won't draw over exclusive-fullscreen games (borderless windowed = fine).
 * Click-to-seek only in modes where the player allows seeking.
-* macOS MediaRemote is a private framework: the sidecar may need a small
-  update across macOS versions (accepted maintenance tax).
+* **macOS:** the private MediaRemote framework is **silently gated on
+  recent macOS (26/27)** — Versdock's sidecar detects the silence and
+  falls back to documented AppleScript bridges for Spotify + Apple
+  Music. That needs the one-time macOS *Automation* permission prompt
+  (honest stat: ~half of Versdock's zero-login promise, kept free and
+  keyless). Other players fall back to the built-in demo track rather
+  than pretending to sync.
 
 ## Run it
 ```bash
@@ -49,10 +55,11 @@ Overlay controls while it floats:
 
 ## Status — Build-by-milestone (see DESIGN.md)
 1. ✅ Overlay shell + playback clock + LRC parser + demo track (this ship)
-2. ⬜ LRCLIB fetch + per-track disk cache + duration-tolerance matching
-3. ⬜ macOS MediaRemote sidecar → real playback, your Mac
+2. ✅ LRCLIB fetch + per-track disk cache + duration-tolerance matching
+3. ✅ macOS sidecar: MediaRemote → AppleScript (Spotify/Apple Music) →
+   demo fallback ladder; **verified live** with real tracks
 4. ⬜ Painter polish: colour presets, album-art auto colour
-5. ⬜ Windows SMTC adapter
+5. ⬜ Windows SMTC adapter + GitHub-Actions build (the free cross-platform path)
 6. ⬜ Settings, tray, autostart, per-track offsets
 
 ---

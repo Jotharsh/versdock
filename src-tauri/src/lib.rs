@@ -3,6 +3,7 @@
 // global hotkey for the click-through lock, demo source thread.
 
 pub mod lyrics;
+pub mod media;
 pub mod playback_clock;
 
 use playback_clock::SharedClock;
@@ -49,7 +50,14 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(playback_clock::SharedClock::new(
-            playback_clock::PlaybackClock::new(lyrics::demo_state(11.0)),
+            playback_clock::PlaybackClock::new(playback_clock::MediaState {
+                source: "idle".into(),
+                title: String::new(),
+                artist: String::new(),
+                duration: 0.0,
+                position: 0.0,
+                playing: false,
+            }),
         ))
         .manage(LockState(AtomicBool::new(false)))
         .invoke_handler(tauri::generate_handler![
@@ -59,6 +67,8 @@ pub fn run() {
             bump_offset
         ])
         .setup(|app| {
+            lyrics::cache::init(app.handle());
+
             // ⌘⇧L — global hotkey to lock/unlock the overlay. Defined on the
             // Rust side because a click-through overlay can't click anything.
             use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
@@ -73,7 +83,7 @@ pub fn run() {
                 }
             })?;
 
-            lyrics::start_demo(app.handle().clone());
+            media::start_source(app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())

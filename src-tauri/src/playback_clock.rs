@@ -20,8 +20,9 @@ pub fn guard<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 
 /// One snapshot from a media source. On macOS this comes from the Swift
 /// sidecar (stdout JSON), on Windows from the WinRT SMTC adapter.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
 pub struct MediaState {
+    #[serde(default)]
     pub source: String, // "demo" | "macos" | "windows" | "spotify" …
     pub title: String,
     pub artist: String,

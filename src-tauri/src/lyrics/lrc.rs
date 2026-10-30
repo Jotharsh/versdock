@@ -3,7 +3,7 @@
 
 use serde::Serialize;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
 pub struct LrcLine {
     pub t: f64, // seconds
     pub text: String,

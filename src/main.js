@@ -80,6 +80,7 @@ window.addEventListener("resize", () => {
 });
 
 function buildTimeline(raw) {
+  els.fan.innerHTML = "";
   lines = raw.map((l) => {
     const el = document.createElement("div");
     el.className = "line";
@@ -87,6 +88,7 @@ function buildTimeline(raw) {
     els.fan.appendChild(el);
     return { t: l.t, text: l.text, el };
   });
+  activeIdx = -1;
   els.wait.classList.add("gone");
   els.lyrics.classList.remove("hidden");
 }
@@ -96,6 +98,10 @@ function setMeta(s) {
   els.artist.textContent = "· " + s.artist;
   document.body.classList.toggle("paused", !s.playing);
   els.bPlay.textContent = s.playing ? "⏸" : "▶";
+  // no title → nothing playing system-wide: idle screen
+  const idle = !s.title;
+  els.wait.classList.toggle("gone", !idle);
+  els.lyrics.classList.toggle("hidden", idle || lines.length === 0);
 }
 
 function flash(msg, ms = 1600) {
@@ -107,7 +113,11 @@ function flash(msg, ms = 1600) {
 
 async function boot() {
   const raw = await invoke("get_timeline");
-  buildTimeline(raw);
+  if (raw.length) buildTimeline(raw);
+  else {
+    // nothing loaded yet — wait for the first lyrics-timeline event
+    els.wait.classList.remove("gone");
+  }
   const s = await invoke("get_state");
   anchor = { pos: s.position, at: performance.now(), playing: s.playing };
   setMeta(s);
@@ -123,6 +133,17 @@ await listen("media-state", (e) => {
   const s = e.payload;
   anchor = { pos: s.position, at: performance.now(), playing: s.playing };
   setMeta(s);
+});
+
+// live lyric swaps (demo seed → LRCLIB fetches → track changes)
+await listen("lyrics-timeline", (e) => {
+  if (Array.isArray(e.payload) && e.payload.length) {
+    buildTimeline(e.payload);
+  }
+});
+
+await listen("lyrics-miss", () => {
+  if (!lines.length) flash("No lyrics available for this track");
 });
 
 // ── toolbar ─────────────────────────────────────────────────
