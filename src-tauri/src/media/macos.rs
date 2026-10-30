@@ -14,19 +14,25 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Emitter, Manager};
 
-fn sidecar_path() -> Option<std::path::PathBuf> {
-    let manifest = env!("CARGO_MANIFEST_DIR"); // src-tauri (dev builds)
-    let p = std::path::Path::new(manifest)
-        .join("../sidecar/media-bridge/media-bridge");
-    if p.exists() {
-        Some(p)
-    } else {
-        None
+fn sidecar_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    // bundled: the Swift binary ships next to the app as a Tauri resource
+    let bundled = app
+        .path()
+        .resource_dir()
+        .ok()?
+        .join("sidecar/media-bridge/media-bridge");
+    if bundled.exists() {
+        return Some(bundled);
     }
+    // dev: built by sidecar/media-bridge/build.sh next to the Rust sources
+    let dev = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../sidecar/media-bridge/media-bridge");
+    dev.exists().then_some(dev)
 }
 
 pub fn start(app: AppHandle) -> bool {
-    let Some(exe) = sidecar_path() else {
+    let Some(exe) = sidecar_path(&app) else {
+        eprintln!("versdock: media sidecar not found — demo source");
         return false;
     };
 

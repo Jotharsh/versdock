@@ -1,0 +1,67 @@
+# Versdock — free cross-platform builds via GitHub-hosted runners.
+# No notarization, no App Store, no paid anything: unsigned artifacts from
+# every tagged run. Windows validates src/media/windows_smtc.rs (the file
+# the maintainer's Mac can't compile) as a bonus side-effect.
+name: build
+
+on:
+  push:
+    tags: ["v*"]
+  # manual trigger so a wip branch can prove it builds before tagging
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: macos
+            run_sidecar: true
+          - os: windows-latest
+            label: windows
+            run_sidecar: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build macOS sidecar (Swift)
+        if: matrix.run_sidecar
+        run: sh sidecar/media-bridge/build.sh
+
+      - name: Lint Rust (warnings are not fatal; errors are)
+        working-directory: src-tauri
+        run: cargo check
+        continue-on-error: false
+
+      - name: Unit tests
+        working-directory: src-tauri
+        run: cargo test
+
+      - name: Frontend install + build (tauri build drives the bundler)
+        run: npm ci
+
+      - name: Build (release bundle: .dmg on macOS, .msi/.exe on Windows)
+        run: npm run tauri build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: versdock-${{ matrix.label }}
+          path: |
+            src-tauri/target/release/bundle/**/*
+          if-no-files-found: error
