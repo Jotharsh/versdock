@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Versdock</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- drag strip: also hosts the floating toolbar (revealed on hover) -->
+    <div id="chrome" data-tauri-drag-region>
+      <div id="titlebar">
+        <span id="t-title"></span>
+        <span id="t-artist"></span>
+      </div>
+      <div id="toolbar">
+        <button id="b-play" title="Play / pause">⏸</button>
+        <button id="b-early" title="Lyrics earlier (−0.5 s)">&lt;</button>
+        <span id="offset" title="Manual sync offset">0.0s</span>
+        <button id="b-late" title="Lyrics later (+0.5 s)">&gt;</button>
+        <button id="b-lock" title="Lock (click-through) — hold ⌘⇧L to unlock">🔒︎</button>
+      </div>
+    </div>
+
+    <div id="wait">Listening for music…</div>
+
+    <div id="lyrics" class="hidden">
+      <div id="fan"><!-- timeline lines --></div>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
