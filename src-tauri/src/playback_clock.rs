@@ -97,6 +97,12 @@ impl PlaybackClock {
         self.offset
     }
 
+    /// Switch to a track-specific offset (loaded from settings on change).
+    pub fn set_offset(&mut self, o: f64) -> f64 {
+        self.offset = o.clamp(-5.0, 5.0);
+        self.offset
+    }
+
     pub fn playing(&self) -> bool {
         self.state.playing
     }

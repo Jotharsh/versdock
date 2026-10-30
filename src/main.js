@@ -210,4 +210,20 @@ await listen("palette", (e) => {
 });
 applyColor();
 
+// ── autostart ────────────────────────────────────────────────
+els.bAuto = document.getElementById("b-auto");
+els.bAuto.addEventListener("click", async () => {
+  const on = await invoke("toggle_autostart");
+  flash(on ? "Versdock starts at login" : "Autostart off");
+});
+
+// track changes reset the clock offset — reflect it in the label
+await listen("media-state", (e) => {
+  if (e.payload?.title) {
+    invoke("get_offset").then((o) => {
+      els.offset.textContent = (o > 0 ? "+" : "") + o.toFixed(1) + "s";
+    });
+  }
+});
+
 requestAnimationFrame(raf);

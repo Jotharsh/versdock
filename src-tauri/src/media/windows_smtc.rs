@@ -110,6 +110,11 @@ fn run(app: tauri::AppHandle) -> windows::core::Result<()> {
             }
         };
         if changed {
+            // per-track offset first, then lyrics
+            if let Some(o) = crate::settings::offset_for(&title, &artist) {
+                let clock = app.state::<SharedClock>();
+                guard(&clock).set_offset(o);
+            }
             lyrics::load_for_track(
                 app.clone(),
                 &lyrics::TrackKey {

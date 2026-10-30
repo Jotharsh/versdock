@@ -88,11 +88,18 @@ fn read_sidecar(app: AppHandle, mut child: Child) {
         }
         let _ = app.emit("media-state", state.clone());
 
-        // new track (title changed) → load lyrics
+        // new track (title changed) → load lyrics + apply its stored offset
         if !state.title.trim().is_empty() {
             let this_track = format!("{}|{}", state.title, state.artist);
             if this_track != last_track {
                 last_track = this_track;
+                {
+                    let clock = app.state::<SharedClock>();
+                    let mut c = guard(&clock);
+                    if let Some(o) = crate::settings::offset_for(&state.title, &state.artist) {
+                        c.set_offset(o);
+                    }
+                }
                 lyrics::load_for_track(
                     app.clone(),
                     &lyrics::TrackKey {

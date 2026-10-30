@@ -5,6 +5,7 @@
 pub mod lyrics;
 pub mod media;
 pub mod playback_clock;
+pub mod settings;
 
 use playback_clock::SharedClock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -37,11 +38,34 @@ fn toggle_play(clock: State<SharedClock>) -> bool {
     c.playing()
 }
 
-/// Nudge the sync by ±0.5 s (persisted per track later — settings.rs).
+/// Nudge the sync by ±0.5 s (persisted per track).
 #[tauri::command]
 fn bump_offset(clock: State<SharedClock>, delta: f64) -> f64 {
     let mut c = playback_clock::guard(&clock);
-    c.bump_offset(delta)
+    let off = c.bump_offset(delta);
+    let s = c.state();
+    if !s.title.trim().is_empty() {
+        settings::record_offset(&s.title, &s.artist, off);
+    }
+    off
+}
+
+/// The offset currently active on the clock (shown in the overlay).
+#[tauri::command]
+fn get_offset(clock: State<SharedClock>) -> f64 {
+    let c = playback_clock::guard(&clock);
+    c.offset()
+}
+
+/// Toggle login-at-startup (free macOS LaunchAgent / Windows registry key
+/// via the official plugin; no daemon, no services).
+#[tauri::command]
+fn toggle_autostart(app: tauri::AppHandle) -> bool {
+    use tauri_plugin_autostart::ManagerExt;
+    let al = app.autolaunch();
+    let is_on = al.is_enabled().unwrap_or(false);
+    let _ = if is_on { al.disable() } else { al.enable() };
+    al.is_enabled().unwrap_or(false)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -49,6 +73,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .manage(playback_clock::SharedClock::new(
             playback_clock::PlaybackClock::new(playback_clock::MediaState {
                 source: "idle".into(),
@@ -64,10 +89,13 @@ pub fn run() {
             get_timeline,
             get_state,
             toggle_play,
-            bump_offset
+            bump_offset,
+            get_offset,
+            toggle_autostart
         ])
         .setup(|app| {
             lyrics::cache::init(app.handle());
+            settings::init(app.handle());
 
             // ⌘⇧L — global hotkey to lock/unlock the overlay. Defined on the
             // Rust side because a click-through overlay can't click anything.

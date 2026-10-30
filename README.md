@@ -60,8 +60,9 @@ Overlay controls while it floats:
    demo fallback ladder; **verified live** with real tracks
 4. ✅ Painter: album-art auto accent (free iTunes Search API) + colour
    presets (🎨 button, persisted)
-5. ⬜ Windows SMTC adapter + GitHub-Actions build (the free cross-platform path)
-6. ⬜ Settings, tray, autostart, per-track offsets
+5. ✅ (partial) Windows SMTC adapter scaffold (CI-validated when pushed)
+6. ✅ Settings layer 1: per-track offsets persisted, autostart toggle,
+   system tray (play/pause + quit) — full settings window TBD
 
 ---
 
