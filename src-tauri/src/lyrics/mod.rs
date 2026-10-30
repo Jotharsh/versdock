@@ -6,6 +6,7 @@
 pub mod cache;
 pub mod lrc;
 pub mod lrclib;
+pub mod palette;
 
 use crate::playback_clock::{guard, MediaState, SharedClock};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -126,9 +127,17 @@ pub fn load_for_track(app: AppHandle, k: &TrackKey) {
         if let Some(hit) = cache::load(&title, &artist, duration) {
             set_timeline(hit.lines);
             let _ = app.emit("lyrics-timeline", timeline());
+            // palette in the same worker thread (art lookup is one HTTP call)
+            palette::set_for_track(&app, &title, &artist, duration);
             return;
         }
-        // 2. LRCLIB (free, no key)
+        // 2. LRCLIB (free, no key); album-art accent fetches on its own
+        // thread so a slow art lookup never delays the timeline swap
+        {
+            let app2 = app.clone();
+            let (t2, a2, d2) = (title.clone(), artist.clone(), duration);
+            thread::spawn(move || palette::set_for_track(&app2, &t2, &a2, d2));
+        }
         match lrclib::fetch(&title, &artist, duration) {
             lrclib::Fetched::Synced(lines, credited) => {
                 cache::store(

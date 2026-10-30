@@ -58,7 +58,8 @@ Overlay controls while it floats:
 2. ✅ LRCLIB fetch + per-track disk cache + duration-tolerance matching
 3. ✅ macOS sidecar: MediaRemote → AppleScript (Spotify/Apple Music) →
    demo fallback ladder; **verified live** with real tracks
-4. ⬜ Painter polish: colour presets, album-art auto colour
+4. ✅ Painter: album-art auto accent (free iTunes Search API) + colour
+   presets (🎨 button, persisted)
 5. ⬜ Windows SMTC adapter + GitHub-Actions build (the free cross-platform path)
 6. ⬜ Settings, tray, autostart, per-track offsets
 

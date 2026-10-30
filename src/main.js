@@ -172,4 +172,42 @@ els.bGlass.addEventListener("click", () => {
   flash(clear ? "Fully clear — no backdrop" : "Glass backdrop on");
 });
 
+// ── colour modes ─────────────────────────────────────────────
+// "auto" = accent comes from the album artwork (Rust picks the dominant
+// colour of the cover). Presets are hand-picked, chosen for legibility
+// over dark glass.
+const COLOR_MODES = [
+  { id: "auto", label: "Album art accent" },
+  { id: "255, 255, 255", label: "Snow white" },
+  { id: "255, 196, 77", label: "Warm amber" },
+  { id: "102, 212, 255", label: "Ice cyan" },
+  { id: "255, 128, 220", label: "Neon rose" },
+  { id: "140, 255, 160", label: "Mint green" },
+];
+let colorIdx = Number(localStorage.getItem("vs-color") || 0) % COLOR_MODES.length;
+let lastArtAccent = null;
+
+function applyColor() {
+  const mode = COLOR_MODES[colorIdx];
+  const accent = mode.id === "auto" ? (lastArtAccent || "255, 255, 255") : mode.id;
+  document.body.style.setProperty("--accent", accent);
+}
+
+els.bColor = document.getElementById("b-color");
+els.bColor.addEventListener("click", () => {
+  colorIdx = (colorIdx + 1) % COLOR_MODES.length;
+  localStorage.setItem("vs-color", String(colorIdx));
+  applyColor();
+  flash("Colour: " + COLOR_MODES[colorIdx].label);
+});
+
+// palette pushes from Rust (album-art dominant colour)
+await listen("palette", (e) => {
+  if (e.payload?.accent) {
+    lastArtAccent = e.payload.accent;
+    applyColor();
+  }
+});
+applyColor();
+
 requestAnimationFrame(raf);

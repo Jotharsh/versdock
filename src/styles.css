@@ -155,7 +155,7 @@ body:hover #titlebar {
 .line.active {
   font-size: 34px;
   font-weight: 700;
-  color: #fff;
+  color: rgb(var(--accent, 255, 255, 255));
   filter: blur(0);
   opacity: 1;
   text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);

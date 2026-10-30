@@ -128,7 +128,7 @@ fn get(client: &ureq::Agent, url: &str) -> Result<String, ureq::Error> {
 }
 
 /// Percent-encode a query value (the subset LRCLIB needs).
-fn enc(s: &str) -> String {
+pub fn enc(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         match b {
