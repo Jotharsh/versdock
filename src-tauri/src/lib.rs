@@ -93,6 +93,14 @@ pub fn run() {
             get_offset,
             toggle_autostart
         ])
+        // closing the overlay hides it instead of quitting — the app lives
+        // in the tray; Quit is a tray action (typical dock-app behaviour)
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let _ = window.hide();
+                api.prevent_close();
+            }
+        })
         .setup(|app| {
             lyrics::cache::init(app.handle());
             settings::init(app.handle());
@@ -102,18 +110,49 @@ pub fn run() {
             use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
             app.global_shortcut().on_shortcut("CmdOrCtrl+Shift+L", |app, _s, event| {
                 if event.state == ShortcutState::Pressed {
-                    let ctl = app.state::<LockState>();
-                    let now = !ctl.0.load(Ordering::Relaxed);
-                    ctl.0.store(now, Ordering::Relaxed);
-                    if let Some(w) = app.get_webview_window("overlay") {
-                        let _ = w.set_ignore_cursor_events(now);
-                    }
+                    toggle_lock(app);
                 }
             })?;
+
+            // ── tray: the widget's always-on-home ──────────────────
+            use tauri::{
+                menu::{Menu, MenuItem},
+                tray::TrayIconBuilder,
+            };
+            let show = MenuItem::with_id(app, "show", "Show overlay", true, None::<&str>)?;
+            let lock = MenuItem::with_id(app, "lock", "Lock overlay (⌘⇧L)", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit Versdock", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show, &lock, &quit])?;
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().cloned().expect("bundle icon"))
+                .tooltip("Versdock — synced lyrics")
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "show" => {
+                        if let Some(w) = app.get_webview_window("overlay") {
+                            let _ = w.show();
+                        }
+                    }
+                    "lock" => toggle_lock(app),
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .build(app)?;
 
             media::start_source(app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Shared by the global hotkey and the tray menu item.
+fn toggle_lock(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    let ctl = app.state::<LockState>();
+    let now = !ctl.0.load(Ordering::Relaxed);
+    ctl.0.store(now, Ordering::Relaxed);
+    if let Some(w) = app.get_webview_window("overlay") {
+        let _ = w.set_ignore_cursor_events(now);
+    }
 }
