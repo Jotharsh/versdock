@@ -1,7 +1,6 @@
 # Versdock — free cross-platform builds via GitHub-hosted runners.
 # No notarization, no App Store, no paid anything: unsigned artifacts from
-# every tagged run. Windows validates src/media/windows_smtc.rs (the file
-# the maintainer's Mac can't compile) as a bonus side-effect.
+# every tagged run. Windows validates src/media/windows_smtc.rs as a bonus.
 name: build
 
 on:
@@ -39,6 +38,10 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Sidecar build
+        if: matrix.run_sidecar
+        run: sh sidecar/media-bridge/build.sh
+
       - name: Lint Rust
         working-directory: src-tauri
         run: cargo check
@@ -48,10 +51,14 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
-      - name: Build
+      - name: Frontend install
+        run: npm ci
+
+      - name: Release build
         run: npm run tauri build
 
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: versdock-${{ matrix.label }}
