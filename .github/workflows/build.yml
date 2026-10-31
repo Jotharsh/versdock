@@ -5,16 +5,21 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Node
-        uses: actions/setup-node@v4
+      - name: Build macOS sidecar (Swift)
+        run: sh sidecar/media-bridge/build.sh
+      - name: Lint Rust
+        working-directory: src-tauri
+        run: cargo check
+        continue-on-error: false
+      - name: Unit tests
+        working-directory: src-tauri
+        run: cargo test
+      - name: Build
+        run: npm run tauri build
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
-          node-version: 20
-
-      - name: Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
+          name: versdock-macos
+          path: |
+            src-tauri/target/release/bundle/**/*
+          if-no-files-found: error
