@@ -38,10 +38,3 @@ jobs:
       - name: Build (release bundle: .dmg on macOS, .msi/.exe on Windows)
         run: npm run tauri build
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: versdock-${{ matrix.label }}
-          path: |
-            src-tauri/target/release/bundle/**/*
-          if-no-files-found: error
