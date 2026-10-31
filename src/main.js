@@ -102,7 +102,13 @@ function setMeta(s) {
   // no title → nothing playing system-wide: idle screen
   const idle = !s.title;
   els.wait.classList.toggle("gone", !idle);
+  if (idle) els.wait.textContent = "Listening for music…";
   els.lyrics.classList.toggle("hidden", idle || lines.length === 0);
+}
+
+function setStatus(text) {
+  els.wait.textContent = text;
+  els.wait.classList.remove("gone");
 }
 
 function flash(msg, ms = 1600) {
@@ -130,13 +136,31 @@ await listen("playback-tick", (e) => {
   anchor = { pos: e.payload, at: performance.now(), playing: anchor.playing };
 });
 
+// live media state: clock anchor, meta, and lyric-lookup status
+let lastMediaKey = "";
 await listen("media-state", (e) => {
   const s = e.payload;
   anchor = { pos: s.position, at: performance.now(), playing: s.playing };
   setMeta(s);
+  const key = s.title ? `${s.title}|${s.artist}` : "";
+  if (key && key !== lastMediaKey) {
+    lastMediaKey = key;
+    // clear whatever the previous "timeline" was (demo seed / old track) so a
+    // real track never sits under stale lines — then show the lookup status
+    if (lines.length) {
+      els.fan.innerHTML = "";
+      lines = [];
+      activeIdx = -1;
+      els.lyrics.classList.add("hidden");
+    }
+    setStatus("Looking up lyrics for this track on LRCLIB…");
+  }
+  if (s.title) {
+    invoke("get_offset").then((o) => {
+      els.offset.textContent = (o > 0 ? "+" : "") + o.toFixed(1) + "s";
+    });
+  }
 });
-
-// live lyric swaps (demo seed → LRCLIB fetches → track changes)
 await listen("lyrics-timeline", (e) => {
   if (Array.isArray(e.payload) && e.payload.length) {
     buildTimeline(e.payload);
@@ -144,7 +168,9 @@ await listen("lyrics-timeline", (e) => {
 });
 
 await listen("lyrics-miss", () => {
-  if (!lines.length) flash("No lyrics available for this track");
+  if (!lines.length) {
+    setStatus("No synced lyrics for this song on LRCLIB — the next track will pick back up. Drag the ⋯ menu to tune colours in the meantime.");
+  }
 });
 
 // ── toolbar ─────────────────────────────────────────────────

@@ -85,14 +85,17 @@ fn toggle_pin(app: &tauri::AppHandle) -> bool {
 
 fn apply_window_mode(app: &tauri::AppHandle, desktop: bool) {
     if let Some(w) = app.get_webview_window("overlay") {
-        if let Some(update_mode) = w.ns_window().ok() {
-            unsafe {
-                window_level::apply_desktop_pin(update_mode, desktop);
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(update_mode) = w.ns_window().ok() {
+                unsafe {
+                    window_level::apply_desktop_pin(update_mode, desktop);
+                }
             }
-            #[cfg(target_os = "windows")]
+        }
+        #[cfg(target_os = "windows")]
+        {
             let _ = w.set_always_on_top(!desktop);
-            #[cfg(target_os = "macos")]
-            let _ = &w;
         }
     }
 }
