@@ -39,10 +39,6 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Build macOS sidecar (Swift)
-        if: matrix.run_sidecar
-        run: sh sidecar/media-bridge/build.sh
-
       - name: Lint Rust
         working-directory: src-tauri
         run: cargo check
