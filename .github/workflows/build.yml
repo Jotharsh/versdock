@@ -1,6 +1,17 @@
 name: build
 on: [push, workflow_dispatch]
 jobs:
-  probe:
-    runs-on: ubuntu-latest
-    steps: [{run: echo hi}]
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            label: macos
+            run_sidecar: true
+          - os: windows-latest
+            label: windows
+            run_sidecar: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo ok
