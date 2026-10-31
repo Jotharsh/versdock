@@ -6,6 +6,7 @@ name: build
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   # manual trigger so a wip branch can prove it builds before tagging
   workflow_dispatch:
