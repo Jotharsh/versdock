@@ -97,7 +97,8 @@ function setMeta(s) {
   els.title.textContent = s.title;
   els.artist.textContent = "· " + s.artist;
   document.body.classList.toggle("paused", !s.playing);
-  els.bPlay.textContent = s.playing ? "⏸" : "▶";
+  const ic = document.getElementById("ic-play")?.firstElementChild;
+  if (ic) ic.setAttribute("d", s.playing ? "M7 5.5h3.4v13H7zM13.6 5.5H17v13h-3.4z" : "M8 5.5v13l11-6.5z");
   // no title → nothing playing system-wide: idle screen
   const idle = !s.title;
   els.wait.classList.toggle("gone", !idle);
@@ -161,15 +162,40 @@ async function bump(delta) {
 els.bEarly.addEventListener("click", () => bump(-0.5));
 els.bLate.addEventListener("click", () => bump(0.5));
 
-els.bLock.addEventListener("click", () => {
-  flash("Lock needs the global hotkey: ⌘⇧L");
+els.bLock.addEventListener("click", async () => {
+  // real click-through lock now — the global hotkey ⌘⇧L unlocks
+  const locked = await invoke("set_locked");
+  if (locked) flash("Locked (click-through) — press ⌘⇧L to unlock", 2600);
 });
 
+// ── settings sheet ──────────────────────────────────────────
+const sheet = document.getElementById("sheet");
+const showSheet = (open) => {
+  sheet.classList.toggle("open", open);
+  document.body.classList.toggle("sheet-open", open);
+};
+els.bMenu = document.getElementById("b-menu");
+els.bMenu.addEventListener("click", () => showSheet(!sheet.classList.contains("open")));
+
 // backdrop glass ↔ fully clear
-els.bGlass = document.getElementById("b-glass");
-els.bGlass.addEventListener("click", () => {
-  const clear = document.body.classList.toggle("clear");
-  flash(clear ? "Fully clear — no backdrop" : "Glass backdrop on");
+const glassRow = (clear) => flash(clear ? "Fully clear — no backdrop" : "Glass backdrop on");
+els.bGlass.addEventListener("click", () => glassRow(document.body.classList.toggle("clear")));
+
+// desktop pin: widget lives behind app windows, above the wallpaper
+const curPin = document.getElementById("cur-pin");
+async function togglePin() {
+  const on = await invoke("toggle_desktop_pin");
+  curPin.textContent = on ? "Desktop" : "Top";
+  flash(on ? "Pinned to desktop — behind your windows" : "Back on top of windows");
+}
+document.getElementById("m-pin").addEventListener("click", togglePin);
+
+// start at login
+const curAuto = document.getElementById("cur-auto");
+document.getElementById("m-auto").addEventListener("click", async () => {
+  const on = await invoke("toggle_autostart");
+  curAuto.textContent = on ? "On" : "Off";
+  flash(on ? "Versdock starts at login" : "Autostart off");
 });
 
 // ── colour modes ─────────────────────────────────────────────
@@ -177,7 +203,7 @@ els.bGlass.addEventListener("click", () => {
 // colour of the cover). Presets are hand-picked, chosen for legibility
 // over dark glass.
 const COLOR_MODES = [
-  { id: "auto", label: "Album art accent" },
+  { id: "auto", label: "Album art" },
   { id: "255, 255, 255", label: "Snow white" },
   { id: "255, 196, 77", label: "Warm amber" },
   { id: "102, 212, 255", label: "Ice cyan" },
@@ -191,14 +217,13 @@ function applyColor() {
   const mode = COLOR_MODES[colorIdx];
   const accent = mode.id === "auto" ? (lastArtAccent || "255, 255, 255") : mode.id;
   document.body.style.setProperty("--accent", accent);
+  document.getElementById("cur-color").textContent = mode.label;
 }
 
-els.bColor = document.getElementById("b-color");
-els.bColor.addEventListener("click", () => {
+document.getElementById("m-color").addEventListener("click", () => {
   colorIdx = (colorIdx + 1) % COLOR_MODES.length;
   localStorage.setItem("vs-color", String(colorIdx));
   applyColor();
-  flash("Colour: " + COLOR_MODES[colorIdx].label);
 });
 
 // palette pushes from Rust (album-art dominant colour)
@@ -210,11 +235,12 @@ await listen("palette", (e) => {
 });
 applyColor();
 
-// ── autostart ────────────────────────────────────────────────
-els.bAuto = document.getElementById("b-auto");
-els.bAuto.addEventListener("click", async () => {
-  const on = await invoke("toggle_autostart");
-  flash(on ? "Versdock starts at login" : "Autostart off");
+// sheet rows reflect the persisted state on boot
+invoke("get_pin").then((on) => {
+  document.getElementById("cur-pin").textContent = on ? "Desktop" : "Top";
+});
+invoke("get_autostart").then((on) => {
+  document.getElementById("cur-auto").textContent = on ? "On" : "Off";
 });
 
 // track changes reset the clock offset — reflect it in the label

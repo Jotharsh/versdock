@@ -16,15 +16,44 @@
         <span id="t-artist"></span>
       </div>
       <div id="toolbar">
-        <button id="b-play" title="Play / pause">⏸</button>
-        <button id="b-early" title="Lyrics earlier (−0.5 s)">&lt;</button>
-        <span id="offset" title="Manual sync offset">0.0s</span>
-        <button id="b-late" title="Lyrics later (+0.5 s)">&gt;</button>
-        <button id="b-glass" title="Toggle backdrop glass / fully clear">◐</button>
-        <button id="b-color" title="Cycle lyric colour (auto = album art)">🎨</button>
-        <button id="b-auto" title="Toggle start-at-login">♻︎</button>
-        <button id="b-lock" title="Lock (click-through) — hold ⌘⇧L to unlock">🔒︎</button>
+        <button id="b-play" title="Play / pause">
+          <svg id="ic-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg>
+        </button>
+        <div id="sync">
+          <button id="b-early" title="Lyrics earlier (−0.5 s)">
+            <svg viewBox="0 0 24 24"><path d="M14.5 6L8.5 12l6 6" fill="none"/></svg>
+          </button>
+          <span id="offset" title="Manual sync offset">0.0s</span>
+          <button id="b-late" title="Lyrics later (+0.5 s)">
+            <svg viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6" fill="none"/></svg>
+          </button>
+        </div>
+        <button id="b-glass" title="Backdrop: glass / fully clear">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.2" fill="none"/>
+            <path d="M12 4.8a7.2 7.2 0 0 1 0 14.4z"/></svg>
+        </button>
+        <button id="b-lock" title="Lock (click-through) — ⌘⇧L to unlock">
+          <svg viewBox="0 0 24 24"><rect x="7" y="10.5" width="10" height="8" rx="2.4" fill="none"/>
+            <path d="M9 10.5V8.4a3 3 0 0 1 6 0v2.1" fill="none"/></svg>
+        </button>
+        <button id="b-menu" title="More">
+          <svg viewBox="0 0 24 24"><circle cx="5.4" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.6" cy="12" r="1.7"/></svg>
+        </button>
       </div>
+    </div>
+
+    <!-- settings sheet (opens from the ⋯ button) -->
+    <div id="sheet" class="closed">
+      <button class="row" id="m-color">
+        <span class="lbl">Colour</span><span class="val" id="cur-color">Album art</span>
+      </button>
+      <button class="row" id="m-pin">
+        <span class="lbl">Pin to desktop</span><span class="val" id="cur-pin">Top</span>
+      </button>
+      <button class="row" id="m-auto">
+        <span class="lbl">Start at login</span><span class="val" id="cur-auto">Off</span>
+      </button>
+      <div class="hint">Lock is click-through · ⌘⇧L unlocks</div>
     </div>
 
     <div id="wait">Listening for music…</div>

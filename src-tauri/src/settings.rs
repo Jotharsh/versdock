@@ -12,6 +12,9 @@ struct File {
     /// "artist|title" → seconds of highlight shift (-5..+5)
     #[serde(default)]
     offsets: HashMap<String, f64>,
+    /// widget pinned *on the desktop* (behind app windows)
+    #[serde(default)]
+    pin_desktop: bool,
 }
 
 static FILE: OnceLock<PathBuf> = OnceLock::new();
@@ -67,4 +70,17 @@ pub fn record_offset(title: &str, artist: &str, offset: f64) {
 
 fn track_key(title: &str, artist: &str) -> String {
     format!("{}|{}", artist.trim().to_lowercase(), title.trim().to_lowercase())
+}
+
+// ── desktop pin ──────────────────────────────────────────────
+pub fn pin_desktop() -> bool {
+    read().pin_desktop
+}
+
+pub fn record_pin_desktop(on: bool) {
+    if let Ok(mut d) = DATA.write() {
+        let f = d.get_or_insert_with(File::default);
+        f.pin_desktop = on;
+        persist(f);
+    }
 }

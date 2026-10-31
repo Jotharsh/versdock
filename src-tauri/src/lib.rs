@@ -6,6 +6,7 @@ pub mod lyrics;
 pub mod media;
 pub mod playback_clock;
 pub mod settings;
+pub mod window_level;
 
 use playback_clock::SharedClock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -68,6 +69,55 @@ fn toggle_autostart(app: tauri::AppHandle) -> bool {
     al.is_enabled().unwrap_or(false)
 }
 
+/// Toggle the widget living *on the desktop* (behind app windows) instead
+/// of always on top. Persisted, re-applied on launch.
+#[tauri::command]
+fn toggle_desktop_pin(app: tauri::AppHandle) -> bool {
+    toggle_pin(&app)
+}
+
+fn toggle_pin(app: &tauri::AppHandle) -> bool {
+    let mode = !settings::pin_desktop();
+    settings::record_pin_desktop(mode);
+    apply_window_mode(app, mode);
+    mode
+}
+
+fn apply_window_mode(app: &tauri::AppHandle, desktop: bool) {
+    if let Some(w) = app.get_webview_window("overlay") {
+        if let Some(update_mode) = w.ns_window().ok() {
+            unsafe {
+                window_level::apply_desktop_pin(update_mode, desktop);
+            }
+            #[cfg(target_os = "windows")]
+            let _ = w.set_always_on_top(!desktop);
+            #[cfg(target_os = "macos")]
+            let _ = &w;
+        }
+    }
+}
+
+/// The toolbar lock button clicks into click-through too (the hotkey
+/// ⌘⇧L still unlocks — the overlay can't be clicked in this mode).
+#[tauri::command]
+fn set_locked(app: tauri::AppHandle) -> bool {
+    toggle_lock(&app);
+    let ctl = app.state::<LockState>();
+    ctl.0.load(Ordering::Relaxed)
+}
+
+/// Sheet-row boot states.
+#[tauri::command]
+fn get_pin(_app: tauri::AppHandle) -> bool {
+    settings::pin_desktop()
+}
+
+#[tauri::command]
+fn get_autostart(app: tauri::AppHandle) -> bool {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().unwrap_or(false)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -91,7 +141,11 @@ pub fn run() {
             toggle_play,
             bump_offset,
             get_offset,
-            toggle_autostart
+            toggle_autostart,
+            toggle_desktop_pin,
+            set_locked,
+            get_pin,
+            get_autostart
         ])
         // closing the overlay hides it instead of quitting — the app lives
         // in the tray; Quit is a tray action (typical dock-app behaviour)
@@ -121,8 +175,9 @@ pub fn run() {
             };
             let show = MenuItem::with_id(app, "show", "Show overlay", true, None::<&str>)?;
             let lock = MenuItem::with_id(app, "lock", "Lock overlay (⌘⇧L)", true, None::<&str>)?;
+            let pin = MenuItem::with_id(app, "pin", "Pin to desktop ↔ on top", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit Versdock", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &lock, &quit])?;
+            let menu = Menu::with_items(app, &[&show, &lock, &pin, &quit])?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().cloned().expect("bundle icon"))
                 .tooltip("Versdock — synced lyrics")
@@ -134,12 +189,18 @@ pub fn run() {
                         }
                     }
                     "lock" => toggle_lock(app),
+                    "pin" => {
+                        toggle_pin(app);
+                    }
                     "quit" => app.exit(0),
                     _ => {}
                 })
                 .build(app)?;
 
             media::start_source(app.handle().clone());
+
+            // restore the persisted window mode (desktop pin)
+            apply_window_mode(app.handle(), settings::pin_desktop());
             Ok(())
         })
         .run(tauri::generate_context!())
