@@ -1,6 +1,6 @@
 # Versdock — free cross-platform builds via GitHub-hosted runners.
 # No notarization, no App Store, no paid anything: unsigned artifacts from
-# every tagged run. Windows validates src/media/windows_smtc.rs (the file
+# every tagged run. Windows also validates src/media/windows_smtc.rs (the file
 # the maintainer's Mac can't compile) as a bonus side-effect.
 name: build
 
