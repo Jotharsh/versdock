@@ -2,16 +2,46 @@ name: build
 on: [push, workflow_dispatch]
 jobs:
   build:
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-            label: macos
-            run_sidecar: true
-          - os: windows-latest
-            label: windows
-            run_sidecar: false
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo ok
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build macOS sidecar (Swift)
+        if: matrix.run_sidecar
+        run: sh sidecar/media-bridge/build.sh
+
+      - name: Lint Rust (warnings are not fatal; errors are)
+        working-directory: src-tauri
+        run: cargo check
+        continue-on-error: false
+
+      - name: Unit tests
+        working-directory: src-tauri
+        run: cargo test
+
+      - name: Frontend install + build (tauri build drives the bundler)
+        run: npm ci
+
+      - name: Build (release bundle: .dmg on macOS, .msi/.exe on Windows)
+        run: npm run tauri build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: versdock-${{ matrix.label }}
+          path: |
+            src-tauri/target/release/bundle/**/*
+          if-no-files-found: error
