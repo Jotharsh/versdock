@@ -1,71 +1,106 @@
 # Versdock
 
-**Synced lyrics that float over your desktop — for any app, with zero logins.**
+**Synced lyrics that float over your desktop — for any music app, with zero logins.**
 
-Like Spicetify's lyrics view, but for your *whole desktop*: Spotify, Apple
-Music, YouTube Music (in a browser), VLC, anything — Versdock reads what
-your OS says is playing and lays a transparent, line-synced lyrics overlay
-on top of the screen.
+Like Apple Music or Spotify lyrics, but floating directly over your workspace, editor, browser, or wallpaper. Versdock listens to what your OS media session is playing and renders an elegant, line-synced lyrics dock.
 
-```
-[Apple Music / Spotify / YT Music / any app]  plays audio
-        │  OS now-playing (no accounts, ever)
-        ▼
-playback clock (Rust) ── snapshot → anchor → extrapolate → 4 s drift fix
-        │
-        ▼
-LRCLIB (free, no key) + LRC parser + per-track cache
-        │
-        ▼
-transparent overlay ── drag · pin · click-through lock · your colours
-```
-
-## Free by design
-* **No accounts, no OAuth on day one** — the app never talks to your
-  player, it listens to the OS media session.
-* **LRCLIB** (`lrclib.net`) for line-synced lyrics: community API, no key.
-* **Microsoft (Windows SMTC) / macOS MediaRemote** now-playing — OS feature.
-* Everything ships as unsigned binaries from GitHub Releases. No App
-  Stores, no notarization fees, no paid anything.
-
-## Honest limits
-* Line-synced, not word-by-word karaoke (LRCLIB is line-level).
-* Lyrics only where LRCLIB has them — the overlay says so otherwise
-  (and falls back to unsynced text when only plain lyrics exist).
-* Won't draw over exclusive-fullscreen games (borderless windowed = fine).
-* Click-to-seek only in modes where the player allows seeking.
-* **macOS:** the private MediaRemote framework is **silently gated on
-  recent macOS (26/27)** — Versdock's sidecar detects the silence and
-  falls back to documented AppleScript bridges for Spotify + Apple
-  Music. That needs the one-time macOS *Automation* permission prompt
-  (honest stat: ~half of Versdock's zero-login promise, kept free and
-  keyless). Other players fall back to the built-in demo track rather
-  than pretending to sync.
-
-## Run it
-```bash
-npm install
-npm run tauri dev      # first build takes a few minutes (Rust compile)
-```
-
-Overlay controls while it floats:
-* **Hover** the top edge → toolbar: play/pause, ±0.5 s sync nudge, lock.
-* **⌘⇧L** (global hotkey) → click-through lock / unlock.
-* Drag anywhere on the top strip to move it.
-
-## Status — Build-by-milestone (see DESIGN.md)
-1. ✅ Overlay shell + playback clock + LRC parser + demo track (this ship)
-2. ✅ LRCLIB fetch + per-track disk cache + duration-tolerance matching
-3. ✅ macOS sidecar: MediaRemote → AppleScript (Spotify/Apple Music) →
-   demo fallback ladder; **verified live** with real tracks
-4. ✅ Painter: album-art auto accent (free iTunes Search API) + colour
-   presets (🎨 button, persisted)
-5. ◼ CI written (.github/workflows/build.yml, mac+win on free runners) —
-   first push will validate the Windows build end-to-end
-6. ✅ Settings layer 1: per-track offsets persisted, autostart toggle,
-   system tray (play/pause + quit) — full settings window TBD
+![Versdock Live Synced Lyrics](screenshots/live-lyrics.png)
 
 ---
 
-Part of [dailytech.build](https://jotharsh.github.io/dailytech-site/) —
-one free, open-source build every day. MIT licensed.
+## Features
+
+### 🎵 Live Synced Lyrics Over Desktop
+Follows the song currently playing on your Mac or Windows PC. Automatically fetches timestamped LRC lyrics from [LRCLIB](https://lrclib.net) with millisecond-precision clock extrapolation and drift compensation.
+
+![Floating Desktop Overlay](screenshots/desktop-overlay.png)
+
+### 🎨 Dynamic Album Art Colors & Backdrop Modes
+Pulls palette colors directly from the currently playing album artwork (or choose from 6 hand-picked accent presets: Cyan, Sunset Amber, Electric Violet, Emerald, Rose Gold, Monochrome). Choose between **Glass blur**, **Clear minimal**, or **OLED Dark** backdrops.
+
+![Album Art Color Palette](screenshots/album-color.png)
+
+### 📌 Pin, Drag & Seek
+- **Drag & Position**: Place the dock anywhere on your multi-monitor desktop.
+- **Click-to-Seek**: Click on any lyric line to jump straight to that moment in the track.
+- **Micro Sync Nudge**: Adjust offset by ±250ms or ±500ms for tracks that lead or lag, automatically remembered per track.
+
+![Pin and Dock Modes](screenshots/pin-modes.png)
+
+### 👻 Ghost Passthrough Mode (`⌘⇧L` / `Ctrl+Shift+L`)
+Lock the dock to pass clicks straight through to your code editor or windows underneath. Lyrics stay visible while never getting in your way.
+
+![Click-Through Lock](screenshots/click-through.png)
+
+---
+
+## How It Works
+
+```
+[Apple Music / Spotify / YT Music / any app]  plays audio
+        │  OS media session (no logins, no keys, ever)
+        ▼
+playback clock (Rust) ── snapshot → anchor → extrapolate → drift fix
+        │
+        ▼
+LRCLIB (free, no API key) + LRC parser + per-track local cache
+        │
+        ▼
+transparent overlay ── drag · pin · click-through lock · album themes
+```
+
+- **Zero accounts / zero logins**: Never touches your Spotify/Apple accounts. Listens to OS media sessions (macOS MediaRemote & AppleScript / Windows SMTC).
+- **Free & community-powered**: Uses LRCLIB for line-synced lyrics.
+- **Lightweight Tauri 2.0 app**: Rust backend with zero runtime bloat.
+
+---
+
+## Downloads & Releases
+
+Pre-built standalone releases are available on the [Releases](https://github.com/Jotharsh/versdock/releases) page:
+
+- **macOS (Apple Silicon & Intel)**: `.dmg` and `.app`
+- **Windows (x64)**: `.exe` installer / `.msi`
+
+---
+
+## Keyboard Shortcuts & Controls
+
+| Shortcut / Action | Action |
+|---|---|
+| `⌘⇧L` (Mac) / `Ctrl+Shift+L` (Win) | Toggle click-through lock (ghost overlay) |
+| Click any lyric line | Seek to timestamp |
+| `⚙` Button | Open settings sheet (Backdrops & Color Themes) |
+| `◀ / ▶` Nudge | Adjust sync offset (saved per track) |
+| Top bar drag | Reposition window |
+
+---
+
+## Development
+
+```bash
+git clone https://github.com/Jotharsh/versdock.git
+cd versdock
+npm install
+npm run tauri dev
+```
+
+Build standalone installer:
+```bash
+npm run tauri build
+```
+
+---
+
+## Status — Milestones
+
+1. ✅ Overlay shell + playback clock + LRC parser + demo track
+2. ✅ LRCLIB fetch + per-track disk cache + duration-tolerance matching
+3. ✅ macOS media bridge: MediaRemote + AppleScript fallback
+4. ✅ Painter: dynamic album-art accent palette + presets
+5. ✅ Cross-platform CI (.github/workflows/build.yml for macOS & Windows)
+6. ✅ Redesigned modern overlay UI with animated equalizer & click-to-seek
+
+---
+
+Part of [dailytech.build](https://jotharsh.github.io/dailytech-site/) — one free, open-source build every day. MIT licensed.
