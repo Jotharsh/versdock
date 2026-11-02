@@ -11,6 +11,7 @@
 use crate::lyrics;
 use crate::playback_clock::{self, guard, SharedClock};
 use std::sync::atomic::Ordering;
+use tauri::{Emitter, Manager};
 use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSessionManager,
     GlobalSystemMediaTransportControlsSessionPlaybackStatus,
