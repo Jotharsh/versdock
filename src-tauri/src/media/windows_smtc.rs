@@ -11,7 +11,7 @@
 use crate::lyrics;
 use crate::playback_clock::{self, guard, SharedClock};
 use std::sync::atomic::Ordering;
-use windows::media::control::{
+use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSessionManager,
     GlobalSystemMediaTransportControlsSessionPlaybackStatus,
 };
@@ -59,22 +59,34 @@ fn run(app: tauri::AppHandle) -> windows::core::Result<()> {
             continue;
         };
 
-        let timeline = session.GetTimelineProperties()?;
-        let title = session
-            .TryGetMediaProperties()
-            .and_then(|m| m.Title())
+        let media_props = session
+            .TryGetMediaPropertiesAsync()
+            .ok()
+            .and_then(|op| op.get().ok());
+
+        let title = media_props
+            .as_ref()
+            .and_then(|m| m.Title().ok())
             .map(|t| t.to_string())
             .unwrap_or_default();
-        let artist = session
-            .TryGetMediaProperties()
-            .and_then(|m| m.Artist())
+        let artist = media_props
+            .as_ref()
+            .and_then(|m| m.Artist().ok())
             .map(|a| a.to_string())
             .unwrap_or_default();
-        let duration = timeline.EndTime().Duration as f64 / 1e7;
-        let position = timeline.Position().Duration as f64 / 1e7;
+
+        let (duration, position) = if let Ok(timeline) = session.GetTimelineProperties() {
+            let dur = timeline.EndTime().map(|t| t.Duration as f64 / 1e7).unwrap_or(0.0);
+            let pos = timeline.Position().map(|t| t.Duration as f64 / 1e7).unwrap_or(0.0);
+            (dur, pos)
+        } else {
+            (0.0, 0.0)
+        };
+
         let playing = session
-            .GetPlaybackInfo()?
-            .PlaybackStatus()
+            .GetPlaybackInfo()
+            .ok()
+            .and_then(|p| p.PlaybackStatus().ok())
             .map(|st| st == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing)
             .unwrap_or(false);
 

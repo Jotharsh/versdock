@@ -6,60 +6,126 @@
     <title>Versdock</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
-    <div id="glass"><!-- legibility backdrop; body.clear hides it --></div>
+  <body class="mode-glass">
+    <!-- Ambient glowing aura behind the lyrics -->
+    <div id="aura"></div>
 
-    <!-- drag strip: also hosts the floating toolbar (revealed on hover) -->
-    <div id="chrome" data-tauri-drag-region>
-      <div id="titlebar">
-        <span id="t-title"></span>
-        <span id="t-artist"></span>
-      </div>
-      <div id="toolbar">
-        <button id="b-play" title="Play / pause">
-          <svg id="ic-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg>
-        </button>
-        <div id="sync">
-          <button id="b-early" title="Lyrics earlier (−0.5 s)">
-            <svg viewBox="0 0 24 24"><path d="M14.5 6L8.5 12l6 6" fill="none"/></svg>
+    <!-- Main frosted glass frame -->
+    <div id="dock">
+      <!-- Drag region and top header -->
+      <header id="chrome" data-tauri-drag-region>
+        <div id="now-playing" data-tauri-drag-region>
+          <div id="wave" class="paused" title="Playback status">
+            <span class="bar bar-1"></span>
+            <span class="bar bar-2"></span>
+            <span class="bar bar-3"></span>
+          </div>
+          <div id="meta" data-tauri-drag-region>
+            <div id="t-title">Ready for music</div>
+            <div id="t-artist">Versdock</div>
+          </div>
+        </div>
+
+        <!-- Floating action pill -->
+        <nav id="toolbar">
+          <button id="b-play" class="tool-btn" title="Play / Pause" aria-label="Play or Pause">
+            <svg id="ic-play" viewBox="0 0 24 24">
+              <path d="M8 5.5v13l11-6.5z" />
+            </svg>
           </button>
-          <span id="offset" title="Manual sync offset">0.0s</span>
-          <button id="b-late" title="Lyrics later (+0.5 s)">
-            <svg viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6" fill="none"/></svg>
+
+          <div id="sync-pill" class="pill-group" title="Lyrics sync offset">
+            <button id="b-early" class="pill-btn" title="Lyrics earlier (−0.5s)">
+              <svg viewBox="0 0 24 24"><path d="M14.5 6L8.5 12l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <span id="offset">0.0s</span>
+            <button id="b-late" class="pill-btn" title="Lyrics later (+0.5s)">
+              <svg viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+
+          <button id="b-lock" class="tool-btn" title="Lock (Click-through) — ⌘⇧L to unlock" aria-label="Lock overlay">
+            <svg viewBox="0 0 24 24">
+              <rect x="7" y="10.5" width="10" height="8.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M9.5 10.5V7.5a2.5 2.5 0 0 1 5 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+
+          <button id="b-menu" class="tool-btn" title="Settings & Appearance" aria-label="Settings">
+            <svg viewBox="0 0 24 24">
+              <circle cx="6" cy="12" r="1.8" fill="currentColor"/>
+              <circle cx="12" cy="12" r="1.8" fill="currentColor"/>
+              <circle cx="18" cy="12" r="1.8" fill="currentColor"/>
+            </svg>
+          </button>
+        </nav>
+      </header>
+
+      <!-- Scrub line under header -->
+      <div id="progress-wrap">
+        <div id="progress-bar">
+          <div id="progress-fill"></div>
+        </div>
+      </div>
+
+      <!-- Settings Dropdown Sheet -->
+      <div id="sheet" class="closed">
+        <div class="sheet-section">
+          <div class="sheet-title">APPEARANCE</div>
+          <button class="sheet-row" id="m-backdrop">
+            <span class="lbl">Backdrop</span>
+            <span class="val" id="cur-backdrop">Glass</span>
+          </button>
+          <button class="sheet-row" id="m-color">
+            <span class="lbl">Accent Color</span>
+            <span class="val" id="cur-color">Album Art</span>
           </button>
         </div>
-        <button id="b-glass" title="Backdrop: glass / fully clear">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.2" fill="none"/>
-            <path d="M12 4.8a7.2 7.2 0 0 1 0 14.4z"/></svg>
-        </button>
-        <button id="b-lock" title="Lock (click-through) — ⌘⇧L to unlock">
-          <svg viewBox="0 0 24 24"><rect x="7" y="10.5" width="10" height="8" rx="2.4" fill="none"/>
-            <path d="M9 10.5V8.4a3 3 0 0 1 6 0v2.1" fill="none"/></svg>
-        </button>
-        <button id="b-menu" title="More">
-          <svg viewBox="0 0 24 24"><circle cx="5.4" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.6" cy="12" r="1.7"/></svg>
+
+        <div class="sheet-section">
+          <div class="sheet-title">BEHAVIOR</div>
+          <button class="sheet-row" id="m-pin">
+            <span class="lbl">Pin to Desktop</span>
+            <span class="val" id="cur-pin">Top</span>
+          </button>
+          <button class="sheet-row" id="m-auto">
+            <span class="lbl">Start at Login</span>
+            <span class="val" id="cur-auto">Off</span>
+          </button>
+        </div>
+
+        <div class="sheet-footer">
+          <span>Click-through lock: <strong>⌘⇧L</strong></span>
+        </div>
+      </div>
+
+      <!-- Idle / Waiting View -->
+      <div id="idle-view">
+        <div class="idle-disc">
+          <div class="disc-glow"></div>
+          <div class="disc-circle">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" />
+            </svg>
+          </div>
+        </div>
+        <div class="idle-text" id="wait-msg">Listening for music…</div>
+        <div class="idle-sub">Spotify • Apple Music • YouTube Music</div>
+        <button id="b-demo" class="demo-btn">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
+          <span>Try Demo Track</span>
         </button>
       </div>
-    </div>
 
-    <!-- settings sheet (opens from the ⋯ button) -->
-    <div id="sheet" class="closed">
-      <button class="row" id="m-color">
-        <span class="lbl">Colour</span><span class="val" id="cur-color">Album art</span>
-      </button>
-      <button class="row" id="m-pin">
-        <span class="lbl">Pin to desktop</span><span class="val" id="cur-pin">Top</span>
-      </button>
-      <button class="row" id="m-auto">
-        <span class="lbl">Start at login</span><span class="val" id="cur-auto">Off</span>
-      </button>
-      <div class="hint">Lock is click-through · ⌘⇧L unlocks</div>
-    </div>
+      <!-- Live Synced Lyrics View -->
+      <main id="lyrics-container" class="hidden">
+        <div id="fan"><!-- Synced lines --></div>
+      </main>
 
-    <div id="wait">Listening for music…</div>
-
-    <div id="lyrics" class="hidden">
-      <div id="fan"><!-- timeline lines --></div>
+      <!-- Status toast message -->
+      <div id="toast"></div>
     </div>
 
     <script type="module" src="/main.js"></script>

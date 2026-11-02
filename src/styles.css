@@ -1,299 +1,526 @@
-/* Versdock overlay — transparent, no background, spicy-lyrics feel.
-   Battery notes: no backdrop-filter, no per-frame blur; blur is reserved
-   for far lines and only re-renders when the active line changes. */
+/* Versdock 2.0 — Synced Desktop Lyrics HUD */
+
+:root {
+  --accent: #ff5a1f;
+  --accent-rgb: 255, 90, 31;
+  --bg-glass: rgba(14, 15, 20, 0.72);
+  --border-glass: rgba(255, 255, 255, 0.12);
+  --text-primary: #f5f5f7;
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  --text-tertiary: rgba(255, 255, 255, 0.35);
+  --card-radius: 22px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
 
 html,
 body {
-  margin: 0;
-  padding: 0;
   width: 100%;
   height: 100%;
   overflow: hidden;
   background: transparent;
-  font-family: -apple-system, "SF Pro Text", "Segoe UI", Inter, Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Inter, Roboto, sans-serif;
   user-select: none;
   cursor: default;
 }
 
-/* ── glass backdrop (legibility layer, toggleable to fully clear) ── */
-/* Note: deliberately NOT backdrop-filter. The WebKit blur behind a fully
-   transparent macOS window glitches into coloured vertical smears (the
-   reported "pink flashes on the right side"). A solid dark tint reads as
-   the same frosted card and is artefact-free. */
-#glass {
+/* ── Ambient Aura ────────────────────────────────────────── */
+#aura {
   position: fixed;
-  inset: 8px;
-  border-radius: 20px;
-  background: rgba(10, 10, 16, 0.58);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: opacity 0.25s;
-}
-/* "clear" mode: nothing behind the lyrics at all */
-body.clear #glass {
-  opacity: 0;
+  inset: 0;
+  border-radius: var(--card-radius);
+  background: radial-gradient(
+    circle at 50% 25%,
+    rgba(var(--accent-rgb), 0.22) 0%,
+    rgba(var(--accent-rgb), 0.05) 45%,
+    transparent 75%
+  );
   pointer-events: none;
+  opacity: 0.85;
+  transition: opacity 0.5s ease, background 0.6s ease;
+  z-index: 1;
 }
 
-/* ── chrome (drag strip + toolbar) ─────────────────────────── */
-#chrome {
+/* ── Main Dock Frame ─────────────────────────────────────── */
+#dock {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 42px;
-  z-index: 10;
+  inset: 6px;
+  border-radius: var(--card-radius);
   display: flex;
-  align-items: center;
-}
-
-#titlebar {
-  padding-left: 12px;
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
-  white-space: nowrap;
+  flex-direction: column;
   overflow: hidden;
-  opacity: 0;
-  transition: opacity 0.25s;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
-#t-title { font-weight: 600; }
-#t-artist { margin-left: 6px; opacity: 0.7; }
 
-#toolbar {
-  margin-left: auto;
-  margin-right: 10px;
+/* Backdrop Modes */
+body.mode-glass #dock {
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+}
+
+body.mode-clear #dock {
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+}
+body.mode-clear #aura {
+  opacity: 0.2;
+}
+
+body.mode-oled #dock {
+  background: #090a0d;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Top Chrome / Titlebar ───────────────────────────────── */
+#chrome {
+  height: 46px;
+  padding: 0 14px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  opacity: 0;
-  transform: translateY(-4px);
-  transition: opacity 0.25s, transform 0.25s;
+  justify-content: space-between;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+  cursor: grab;
 }
-#toolbar button,
-#sheet .row {
+#chrome:active {
+  cursor: grabbing;
+}
+
+#now-playing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 60%;
+}
+
+/* Animated Soundwave Indicator */
+#wave {
+  display: flex;
+  align-items: flex-end;
+  gap: 2.5px;
+  height: 14px;
+  width: 14px;
+  flex-shrink: 0;
+}
+#wave .bar {
+  width: 2.5px;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  animation: equalize 1s infinite ease-in-out;
+}
+#wave .bar-1 { animation-delay: 0.1s; height: 45%; }
+#wave .bar-2 { animation-delay: 0.3s; height: 90%; }
+#wave .bar-3 { animation-delay: 0.2s; height: 60%; }
+
+#wave.paused .bar {
+  animation: none;
+  height: 3px !important;
+  opacity: 0.5;
+  background: var(--text-secondary);
+}
+
+@keyframes equalize {
+  0%, 100% { height: 25%; }
+  50% { height: 100%; }
+}
+
+#meta {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  white-space: nowrap;
+}
+#t-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#t-artist {
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Action Toolbar ──────────────────────────────────────── */
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  opacity: 0.35;
+  transition: opacity 0.22s ease;
+}
+#dock:hover #toolbar {
+  opacity: 1;
+}
+
+.tool-btn {
   appearance: none;
-  border: 0;
-  /* solid-ish fill instead of backdrop-filter — blur inside the
-     transparent window is what caused the coloured tile smears */
-  background: rgba(22, 22, 27, 0.86);
-  color: #f4f4f6;
-  height: 27px;
-  border-radius: 9px;
-  cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
-  transition: background 0.18s, transform 0.18s, border-color 0.18s;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(30, 31, 38, 0.7);
+  color: var(--text-primary);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
-#toolbar button { width: 27px; padding: 0; }
-#toolbar button:hover,
-#sheet .row:hover {
-  background: rgba(46, 46, 52, 0.72);
-  border-color: rgba(255, 255, 255, 0.12);
+.tool-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
 }
-#toolbar button:active { transform: translateY(0); }
-
-/* icon strokes — uniform, so nothing looks like a random emoji pile */
-#toolbar svg {
-  width: 15px;
-  height: 15px;
-  stroke: #f4f4f6;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  fill: currentColor;
-  fill-rule: evenodd;
+.tool-btn:active {
+  transform: translateY(0);
+}
+.tool-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
-/* offset: compact mono segment between the two chevrons */
-#sync {
+/* Sync Offset Pill */
+.pill-group {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  height: 27px;
-  padding: 0 4px;
-  border-radius: 9px;
-  background: rgba(22, 22, 27, 0.86);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  height: 28px;
+  background: rgba(30, 31, 38, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 0 2px;
+  gap: 1px;
 }
-#toolbar #sync button {
-  width: 20px;
-  height: 23px;
+.pill-btn {
+  appearance: none;
+  border: none;
   background: transparent;
-  border: 0;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  color: var(--text-secondary);
+  width: 20px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.12s ease;
 }
-#toolbar #sync button:hover { background: rgba(255, 255, 255, 0.09); transform: none; }
-
+.pill-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+.pill-btn svg {
+  width: 12px;
+  height: 12px;
+}
 #offset {
-  min-width: 34px;
-  text-align: center;
   font-size: 10px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.66);
+  color: var(--text-secondary);
+  min-width: 32px;
+  text-align: center;
 }
 
-/* chrome appears only while the pointer is over the window */
-body:hover #toolbar,
-body:hover #titlebar {
-  opacity: 1;
+/* ── Progress Bar ────────────────────────────────────────── */
+#progress-wrap {
+  width: 100%;
+  height: 2px;
+  padding: 0 14px;
+  box-sizing: border-box;
+}
+#progress-bar {
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+#progress-fill {
+  width: 0%;
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.6);
+  border-radius: 2px;
+  transition: width 0.15s linear;
+}
+
+/* ── Settings Dropdown Sheet ─────────────────────────────── */
+#sheet {
+  position: absolute;
+  top: 50px;
+  right: 14px;
+  width: 210px;
+  background: rgba(20, 21, 28, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65);
+  padding: 10px;
+  z-index: 50;
+  transform-origin: top right;
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#sheet.closed {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.95) translateY(-6px);
+}
+
+.sheet-section {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+.sheet-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  padding: 4px 6px 2px;
+}
+.sheet-row {
+  appearance: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.12s ease;
+}
+.sheet-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.sheet-row .lbl {
+  color: var(--text-primary);
+  font-weight: 450;
+}
+.sheet-row .val {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.sheet-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px 6px 2px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+.sheet-footer strong {
+  color: var(--accent);
+}
+
+/* ── Idle / Waiting State ────────────────────────────────── */
+#idle-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 24px;
+  text-align: center;
+  gap: 10px;
+  transition: opacity 0.3s ease;
+}
+#idle-view.gone {
+  display: none;
+}
+
+.idle-disc {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.disc-glow {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.35) 0%, transparent 70%);
+  animation: pulse-glow 3s infinite ease-in-out;
+}
+.disc-circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(30, 32, 40, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes pulse-glow {
+  0%, 100% { transform: scale(0.92); opacity: 0.5; }
+  50% { transform: scale(1.1); opacity: 0.85; }
+}
+
+.idle-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.idle-sub {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.demo-btn {
+  appearance: none;
+  border: 1px solid rgba(var(--accent-rgb), 0.4);
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: all 0.16s ease;
+}
+.demo-btn:hover {
+  background: rgba(var(--accent-rgb), 0.28);
+  border-color: rgba(var(--accent-rgb), 0.7);
+  transform: translateY(-1px);
+}
+.demo-btn:active {
   transform: translateY(0);
 }
 
-/* ── settings sheet (from the ⋯ button) ───────────────────── */
-#sheet {
-  position: fixed;
-  top: 44px;
-  right: 10px;
-  min-width: 196px;
-  padding: 6px;
-  z-index: 20;
-  border-radius: 14px;
-  background: rgba(18, 18, 23, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
-  opacity: 0;
-  transform: translateY(-6px) scale(0.98);
-  pointer-events: none;
-  transition: opacity 0.18s, transform 0.18s;
-}
-#sheet.open {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  pointer-events: auto;
-}
-#sheet .row {
-  width: 100%;
-  height: 31px;
-  padding: 0 10px;
-  border-radius: 9px;
-  font-size: 12px;
-  justify-content: space-between;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-#sheet .row:hover { background: rgba(255, 255, 255, 0.08); transform: none; }
-#sheet .lbl { color: rgba(255, 255, 255, 0.85); }
-#sheet .val {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
-  font-variant-numeric: tabular-nums;
-}
-#sheet .hint {
-  padding: 7px 10px 3px;
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.38);
-}
-
-/* ── lyrics ───────────────────────────────────────────────── */
-#lyrics {
-  position: fixed;
-  inset: 0;
+/* ── Live Synced Lyrics ──────────────────────────────────── */
+#lyrics-container {
+  flex: 1;
+  position: relative;
   overflow: hidden;
   -webkit-mask-image: linear-gradient(
     to bottom,
-    transparent 0,
-    #000 16%,
-    #000 84%,
+    transparent 0%,
+    rgba(0, 0, 0, 0.7) 14%,
+    rgba(0, 0, 0, 1) 32%,
+    rgba(0, 0, 0, 1) 68%,
+    rgba(0, 0, 0, 0.7) 86%,
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
-    transparent 0,
-    #000 16%,
-    #000 84%,
+    transparent 0%,
+    rgba(0, 0, 0, 0.7) 14%,
+    rgba(0, 0, 0, 1) 32%,
+    rgba(0, 0, 0, 1) 68%,
+    rgba(0, 0, 0, 0.7) 86%,
     transparent 100%
   );
-  transition: opacity 0.5s;
+  transition: opacity 0.35s ease;
 }
-#lyrics.hidden { opacity: 0; }
+#lyrics-container.hidden {
+  display: none;
+}
 
 #fan {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  gap: 14px;
-  padding: 0 22px;
-  box-sizing: border-box;
+  padding: 0 24px;
+  gap: 16px;
   will-change: transform;
-  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.45s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
 .line {
-  font-size: 23px;
-  line-height: 1.25;
+  font-size: 21px;
+  line-height: 1.3;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.34);
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
-  /* NOTE: no CSS filter/blur here. filter + font-size transitions inside a
-     fully transparent macOS WKWebView produce GPU tile artifacts — the
-     reported "pink flashes": stale tiles smear as solid accent-coloured
-     vertical bars for a frame or two. Opacity-only depth looks the same. */
+  color: var(--text-secondary);
+  opacity: 0.35;
+  cursor: pointer;
+  transform-origin: left center;
   transition:
-    font-size 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    color 0.28s,
-    opacity 0.28s;
-  scroll-behavior: smooth;
+    font-size 0.32s cubic-bezier(0.2, 0.9, 0.3, 1),
+    color 0.32s ease,
+    opacity 0.32s ease,
+    transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1),
+    text-shadow 0.32s ease;
+}
+.line:hover {
+  opacity: 0.75;
 }
 
-.line.far { opacity: 0.4; }
-
+/* Active Line Styling — Apple Music Style */
 .line.active {
-  font-size: 34px;
+  font-size: 29px;
   font-weight: 700;
-  color: rgb(var(--accent, 255, 255, 255));
+  color: var(--accent);
   opacity: 1;
-  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);
+  transform: scale(1.03);
+  text-shadow: 0 2px 20px rgba(var(--accent-rgb), 0.45);
 }
 
-/* paused: soften everything */
-body.paused .line { opacity: 0.45; }
-body.paused .line.active { opacity: 0.75; }
-
-/* ── waiting state ────────────────────────────────────────── */
-#wait {
-  position: fixed;
-  inset: 40px 44px 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12.5px;
-  line-height: 1.6;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.62);
-  transition: opacity 0.4s;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+.line.near {
+  opacity: 0.65;
 }
-#wait.gone { opacity: 0; pointer-events: none; }
+.line.far {
+  opacity: 0.22;
+}
 
-/* flash message (lock hint, etc.) */
-#flash {
-  position: fixed;
-  bottom: 18px;
-  left: 0;
-  right: 0;
-  text-align: center;
+/* Paused State */
+body.paused .line.active {
+  opacity: 0.75;
+  text-shadow: 0 2px 10px rgba(var(--accent-rgb), 0.25);
+}
+
+/* ── Floating Toast / Flash ──────────────────────────────── */
+#toast {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: rgba(22, 23, 30, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 6px 14px;
+  border-radius: 20px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.75);
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
-  opacity: 0;
-  transition: opacity 0.25s;
+  font-weight: 500;
+  color: var(--text-primary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   pointer-events: none;
+  opacity: 0;
+  transition: all 0.22s ease;
+  z-index: 99;
+  white-space: nowrap;
 }
-#flash.show { opacity: 1; }
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

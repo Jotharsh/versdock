@@ -58,6 +58,32 @@ fn get_offset(clock: State<SharedClock>) -> f64 {
     c.offset()
 }
 
+/// Start or preview demo track with full synced lyrics
+#[tauri::command]
+fn trigger_demo(app: tauri::AppHandle) {
+    use tauri::Emitter;
+    lyrics::seed_demo();
+    let clock = app.state::<SharedClock>();
+    let state = lyrics::demo_state(12.0);
+    playback_clock::guard(&clock).resync(state.clone());
+    let _ = app.emit("media-state", state);
+    let _ = app.emit("lyrics-timeline", lyrics::timeline());
+    lyrics::start_demo(app);
+}
+
+/// Seek to specific position (e.g. clicking a lyric line)
+#[tauri::command]
+fn seek(app: tauri::AppHandle, clock: State<SharedClock>, position: f64) -> f64 {
+    use tauri::Emitter;
+    let mut c = playback_clock::guard(&clock);
+    let mut s = c.state();
+    s.position = position.max(0.0);
+    c.resync(s.clone());
+    let _ = app.emit("playback-tick", s.position);
+    let _ = app.emit("media-state", s);
+    position
+}
+
 /// Toggle login-at-startup (free macOS LaunchAgent / Windows registry key
 /// via the official plugin; no daemon, no services).
 #[tauri::command]
@@ -148,7 +174,9 @@ pub fn run() {
             toggle_desktop_pin,
             set_locked,
             get_pin,
-            get_autostart
+            get_autostart,
+            trigger_demo,
+            seek
         ])
         // closing the overlay hides it instead of quitting — the app lives
         // in the tray; Quit is a tray action (typical dock-app behaviour)
