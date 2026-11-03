@@ -140,47 +140,15 @@ func mrNumber(_ dict: CFDictionary?, _ key: String) -> Double? {
     return d.isNaN ? nil : d
 }
 
-func runMediaRemoteLoop() {
-    // Poll at ~1 Hz: the notification registration differs between macOS
-    // versions — polling is the well-trodden path (DESIGN §4).
-    let getInfo = mrGetInfo!
-    while true {
-        getInfo(MRQ) { info in
-            let title = mrString(info, "kMRMediaRemoteNowPlayingInfoTitle") ?? ""
-            let artist = mrString(info, "kMRMediaRemoteNowPlayingInfoArtist") ?? ""
-            if title.isEmpty && artist.isEmpty {
-                noteNone()
-                return
-            }
-            maybeEmit(title: title, artist: artist,
-                      duration: mrNumber(info, "kMRMediaRemoteNowPlayingInfoDuration"),
-                      position: mrNumber(info, "kMRMediaRemoteNowPlayingInfoElapsedTime"),
-                      playing: true)
-        }
-        Thread.sleep(forTimeInterval: 0.8)
-        if getppid() == 1 { exit(0) }
-        // Symbols exist but callbacks stay silent → macOS is gating the
-        // framework (26/27). Fall to the AppleScript bridge.
-        if lastWasNone() && Date().timeIntervalSince(lastEmitted()) > 4.0 {
-            break
-        }
-    }
-    runAppleScriptBridge()
-}
-
-// ── source 2: AppleScript adapters (documented, reliable) ──────
+// ── AppleScript adapters (Spotify & Apple Music) ──────────────
 func osa(_ source: String) -> String {
     var err: NSDictionary?
     guard let out = NSAppleScript(source: source)?.executeAndReturnError(&err) else {
-        if let e = err {
-            fputs("mediabridge osa error: \(e)\n", stderr)
-        }
         return ""
     }
     return out.stringValue ?? ""
 }
 
-/// "mm:ss" fallback (Music may report position as a clock string).
 func parseClock(_ s: String) -> Double? {
     let parts = s.split(separator: ":").compactMap { Double($0) }
     guard parts.count == 2 else { return nil }
@@ -195,13 +163,9 @@ struct NowPlaying {
     var playing: Bool
 }
 
-/// Poll one player via AppleScript. Returns nil when the app isn't running
-/// or reports nothing usable. Never *launches* an app: every script starts
-/// with an `is running` check.
 func queryApp(_ app: String) -> NowPlaying? {
     let script: String
     if app == "Spotify" {
-        // Spotify's duration is milliseconds; divide here in Swift.
         script = """
         if application "Spotify" is running then
           tell application "Spotify"
@@ -215,7 +179,6 @@ func queryApp(_ app: String) -> NowPlaying? {
         end if
         """
     } else {
-        // Music's duration is seconds.
         script = """
         if application "Music" is running then
           tell application "Music"
@@ -241,11 +204,41 @@ func queryApp(_ app: String) -> NowPlaying? {
                       position: position, playing: playing)
 }
 
-func runAppleScriptBridge() -> Never {
-    fputs("mediabridge: applescript bridge\n", stderr)
+// ── unified runner (AppleScript + MediaRemote) ────────────────
+func runUnifiedLoop() -> Never {
+    fputs("mediabridge: unified bridge active (AppleScript + MediaRemote)\n", stderr)
     let appCycle = ["Spotify", "Music"]
+    var mrState: NowPlaying?
+    let mrLock = NSLock()
+
+    // Background MediaRemote poller (catches Chrome, Safari, YouTube, VLC)
+    if let getInfo = mrGetInfo {
+        MRQ.async {
+            while true {
+                let sem = DispatchSemaphore(value: 0)
+                getInfo(MRQ) { info in
+                    let title = mrString(info, "kMRMediaRemoteNowPlayingInfoTitle") ?? ""
+                    let artist = mrString(info, "kMRMediaRemoteNowPlayingInfoArtist") ?? ""
+                    let dur = mrNumber(info, "kMRMediaRemoteNowPlayingInfoDuration") ?? 0
+                    let pos = mrNumber(info, "kMRMediaRemoteNowPlayingInfoElapsedTime") ?? 0
+                    mrLock.lock()
+                    if !title.isEmpty || !artist.isEmpty {
+                        mrState = NowPlaying(title: title, artist: artist, duration: dur, position: pos, playing: true)
+                    } else {
+                        mrState = nil
+                    }
+                    mrLock.unlock()
+                    sem.signal()
+                }
+                _ = sem.wait(timeout: .now() + 1.5)
+                Thread.sleep(forTimeInterval: 0.8)
+                if getppid() == 1 { exit(0) }
+            }
+        }
+    }
+
     while true {
-        // arbitration: a *playing* app wins; otherwise a paused one is held
+        // 1. High-fidelity native desktop players: Spotify & Apple Music
         var playing: NowPlaying?
         var paused: NowPlaying?
         for app in appCycle {
@@ -257,38 +250,34 @@ func runAppleScriptBridge() -> Never {
             }
             if playing != nil { break }
         }
+
+        // 2. MediaRemote fallback for browser tabs / other media players
+        if playing == nil {
+            mrLock.lock()
+            let mr = mrState
+            mrLock.unlock()
+            if let mr = mr, !mr.title.isEmpty {
+                if paused == nil {
+                    playing = mr
+                }
+            }
+        }
+
+        // 3. Emit or silence
         if playing == nil && paused == nil {
             noteNone()
         } else {
             let s = playing ?? paused!
             maybeEmit(title: s.title, artist: s.artist,
-                      duration: s.duration, position: s.position,
+                      duration: s.duration > 0 ? s.duration : nil,
+                      position: s.position >= 0 ? s.position : nil,
                       playing: s.playing)
         }
-        Thread.sleep(forTimeInterval: 1.0)
-        if getppid() == 1 { exit(0) }   // orphaned by parent exit
-    }
-}
 
-// ── source 3: demo heartbeat (dev fallback) ────────────────────
-func runDemoHeartbeat() -> Never {
-    var pos: Double = 11.0
-    let duration = 222.0
-    while true {
-        emit(Event(event: "state", title: "Neon Between the Lines (demo)",
-                   artist: "Versdock Demo", duration: duration,
-                   position: pos, playing: true))
-        pos += 1.0
-        if pos >= duration { pos = 0.2 }
         Thread.sleep(forTimeInterval: 1.0)
         if getppid() == 1 { exit(0) }
     }
 }
 
 // ── entry ──────────────────────────────────────────────────────
-if mrGetInfo != nil {
-    runMediaRemoteLoop()   // self-falls back to AppleScript when gated
-} else {
-    fputs("mediabridge: MediaRemote unavailable — applescript bridge\n", stderr)
-    runAppleScriptBridge()
-}
+runUnifiedLoop()

@@ -15,26 +15,62 @@ use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Emitter, Manager};
 
 fn sidecar_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
-    // bundled: the Swift binary ships next to the app as a Tauri resource
-    let bundled = app
-        .path()
-        .resource_dir()
-        .ok()?
-        .join("sidecar/media-bridge/media-bridge");
-    if bundled.exists() {
-        return Some(bundled);
+    // 1. Check bundled resource directory (Tauri .app package)
+    if let Ok(res) = app.path().resource_dir() {
+        let candidates = [
+            res.join("sidecar/media-bridge"),
+            res.join("sidecar/media-bridge/media-bridge"),
+            res.join("media-bridge"),
+        ];
+        for c in candidates {
+            if c.exists() {
+                return Some(c);
+            }
+        }
     }
-    // dev: built by sidecar/media-bridge/build.sh next to the Rust sources
+
+    // 2. Check next to current executable inside MacOS/
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let next_to_exe = dir.join("media-bridge");
+            if next_to_exe.exists() {
+                return Some(next_to_exe);
+            }
+            let res_sidecar = dir.join("../Resources/sidecar/media-bridge");
+            if res_sidecar.exists() {
+                return Some(res_sidecar);
+            }
+        }
+    }
+
+    // 3. Dev mode: built by sidecar/media-bridge/build.sh next to the Rust sources
     let dev = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../sidecar/media-bridge/media-bridge");
-    dev.exists().then_some(dev)
+    if dev.exists() {
+        return Some(dev);
+    }
+
+    None
 }
 
 pub fn start(app: AppHandle) -> bool {
     let Some(exe) = sidecar_path(&app) else {
-        eprintln!("versdock: media sidecar not found — demo source");
+        eprintln!("versdock: media sidecar not found — falling back to demo source");
         return false;
     };
+
+    // Ensure executable permissions on macOS
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(&exe) {
+            let mut perms = meta.permissions();
+            if perms.mode() & 0o111 == 0 {
+                perms.set_mode(0o755);
+                let _ = std::fs::set_permissions(&exe, perms);
+            }
+        }
+    }
 
     let child = match Command::new(&exe)
         .stdout(Stdio::piped())
@@ -42,7 +78,10 @@ pub fn start(app: AppHandle) -> bool {
         .spawn()
     {
         Ok(c) => c,
-        Err(_) => return false,
+        Err(e) => {
+            eprintln!("versdock: failed to spawn sidecar at {:?}: {e}", exe);
+            return false;
+        }
     };
 
     let app2 = app.clone();

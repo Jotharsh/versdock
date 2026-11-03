@@ -67,6 +67,13 @@ fn emit_accent(app: &tauri::AppHandle, c: [u8; 3]) {
 
 fn client() -> ureq::Agent {
     ureq::AgentBuilder::new()
+        .resolver(|netloc: &str| {
+            use std::net::ToSocketAddrs;
+            let mut addrs: Vec<std::net::SocketAddr> = netloc.to_socket_addrs()?.collect();
+            addrs.sort_by_key(|a| if a.is_ipv4() { 0 } else { 1 });
+            Ok(addrs)
+        })
+        .timeout_connect(std::time::Duration::from_secs(4))
         .timeout(std::time::Duration::from_secs(8))
         .build()
 }
